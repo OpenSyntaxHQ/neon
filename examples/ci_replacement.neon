@@ -1,0 +1,146 @@
+# NEON example that mirrors a complex GitHub Actions CI workflow.
+# This is source-of-truth config (not directly executable by GitHub Actions).
+{
+  name: "NEON CI",
+  version: 1,
+  metadata: {
+    owner: "OpenSyntaxHQ",
+    repository: "neon",
+    created_at: @datetime("2026-03-16T21:00:00+05:30"),
+    report_date: @date("2026-03-16"),
+    timezone: "Asia/Kolkata",
+    maintainers: [
+      {name: "nightslayer", role: "core-maintainer"},
+      {name: "ci-bot", role: "automation"},
+    ],
+  },
+
+  triggers: {
+    push: {
+      branches: ["main", "release/*",],
+      paths-ignore: ["docs/**", "*.md",],
+    },
+    pull_request: {
+      branches: ["main",],
+    },
+    schedule: [
+      {cron: "0 2 * * *", reason: "nightly full matrix"},
+      {cron: "0 9 * * 1", reason: "weekly dependency audit"},
+    ],
+    workflow_dispatch: {
+      inputs: {
+        run_benchmarks: {type: "boolean", default: false},
+        deploy_env: {type: "string", default: "staging"},
+      },
+    },
+  },
+
+  defaults: {
+    shell: "bash",
+    timeout: @duration("1h30m"),
+    maintenance_window: @time("22:30:00+05:30"),
+  },
+
+  env: {
+    PIP_DISABLE_PIP_VERSION_CHECK: "1",
+    PYTHONUNBUFFERED: "1",
+    CI_CACHE_PREFIX: "neon-ci-v2",
+    OPENAI_API_KEY: @env(OPENAI_API_KEY, ""),
+    PYPI_TOKEN: @env(PYPI_TOKEN, ""),
+  },
+
+  concurrency: {
+    group: "ci-${{ github.ref }}",
+    cancel-in-progress: true,
+  },
+
+  permissions: {
+    contents: "read",
+    checks: "write",
+    id-token: "write",
+  },
+
+  jobs: {
+    lint-type-test: {
+      runs-on: "ubuntu-latest",
+      strategy: {
+        matrix: {
+          python: ["3.10", "3.11", "3.12", "3.13",],
+        },
+        fail-fast: false,
+      },
+      steps: [
+        {name: "Checkout", uses: "actions/checkout@v4"},
+        {
+          name: "Setup Python",
+          uses: "actions/setup-python@v5",
+          with: {python-version: "${{ matrix.python }}"},
+        },
+        {
+          name: "Install dependencies",
+          run: "python -m pip install --upgrade pip\npip install -e \"parsers/python[dev]\"",
+        },
+        {name: "Lint", run: "PYTHONPATH=.:parsers/python/src ruff check ."},
+        {name: "Format check", run: "PYTHONPATH=.:parsers/python/src ruff format --check ."},
+        {name: "Type check", run: "PYTHONPATH=.:parsers/python/src mypy parsers/python/src/neon"},
+        {name: "Unit tests", run: "PYTHONPATH=.:parsers/python/src pytest"},
+      ],
+    },
+
+    conformance: {
+      needs: ["lint-type-test",],
+      runs-on: "ubuntu-latest",
+      steps: [
+        {name: "Checkout", uses: "actions/checkout@v4"},
+        {
+          name: "Setup Python",
+          uses: "actions/setup-python@v5",
+          with: {python-version: "3.12"},
+        },
+        {
+          name: "Install dependencies",
+          run: "python -m pip install --upgrade pip\npip install -e \"parsers/python[dev]\"",
+        },
+        {name: "Validate grammar", run: "python scripts/validate_grammar.py"},
+        {name: "Run conformance", run: "python scripts/run_conformance.py"},
+      ],
+    },
+
+    benchmark: {
+      if: "${{ github.event_name == 'workflow_dispatch' && inputs.run_benchmarks }}",
+      needs: ["conformance",],
+      runs-on: "ubuntu-latest",
+      steps: [
+        {name: "Checkout", uses: "actions/checkout@v4"},
+        {
+          name: "Setup Python",
+          uses: "actions/setup-python@v5",
+          with: {python-version: "3.12"},
+        },
+        {
+          name: "Install dependencies",
+          run: "python -m pip install --upgrade pip\npip install -e \"parsers/python[dev]\"",
+        },
+        {name: "Run benchmark", run: "python scripts/benchmark.py"},
+      ],
+    },
+
+    release-dry-run: {
+      if: "${{ github.ref == 'refs/heads/main' }}",
+      needs: ["conformance",],
+      runs-on: "ubuntu-latest",
+      environment: "staging",
+      steps: [
+        {name: "Checkout", uses: "actions/checkout@v4"},
+        {name: "Package check", run: "python -m pip install build\npython -m build parsers/python"},
+        {name: "Release checklist", run: "cat docs/RELEASE_CHECKLIST.md"},
+      ],
+    },
+  },
+
+  release_policy: {
+    first_public_release: "1.0.0",
+    changes_after_1_0: "major-only",
+    migration_notes_required: true,
+  },
+}
