@@ -39,7 +39,7 @@ jobs:
         run: mypy parsers/python/src/neon
 
       - name: Tests
-        run: pytest
+        run: PYTHONPATH=.:parsers/python/src pytest
 
       - name: Conformance
         run: python scripts/run_conformance.py
