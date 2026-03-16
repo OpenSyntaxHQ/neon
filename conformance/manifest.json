@@ -1,0 +1,6 @@
+{
+  "spec_version": "1.0",
+  "runner_contract_version": 1,
+  "modes": ["config", "api"],
+  "normalization": "conformance/README.md#normalized-value-contract"
+}

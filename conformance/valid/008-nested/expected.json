@@ -1,0 +1,1 @@
+{"svc": {"name": "api", "ports": [8080, 8443], "meta": {"zone": "ap-south-1"}}}

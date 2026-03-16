@@ -1,0 +1,42 @@
+document        = ws , value , ws , EOF ;
+
+value           = object
+                | array
+                | string
+                | number
+                | "true"
+                | "false"
+                | "null"
+                | tag
+                | identifier ;
+
+object          = "{" , ws , [ pair , { ws , "," , ws , pair } , [ ws , "," ] ] , ws , "}" ;
+pair            = key , ws , ":" , ws , value ;
+key             = string | identifier ;
+
+array           = "[" , ws , [ value , { ws , "," , ws , value } , [ ws , "," ] ] , ws , "]" ;
+
+tag             = "@" , identifier , ws , "(" , ws , [ args ] , ws , ")" ;
+args            = value , { ws , "," , ws , value } ;
+
+identifier      = ident_start , { ident_continue } ;
+ident_start      = "A".."Z" | "a".."z" | "_" ;
+ident_continue   = ident_start | "0".."9" | "-" ;
+
+number          = [ "-" ] , int , [ frac ] , [ exp ] ;
+int             = "0" | ( "1".."9" , { "0".."9" } ) ;
+frac            = "." , "0".."9" , { "0".."9" } ;
+exp             = ( "e" | "E" ) , [ "+" | "-" ] , "0".."9" , { "0".."9" } ;
+
+string          = "\"" , { char } , "\"" ;
+char            = unescaped | escape ;
+unescaped       = ? any character except backslash, quote, and control chars ? ;
+escape          = "\\" , ( "\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t" | ( "u" , hex , hex , hex , hex ) ) ;
+hex             = "0".."9" | "A".."F" | "a".."f" ;
+
+ws              = { " " | "\t" | "\r" | "\n" | comment } ;
+comment         = line_comment | hash_comment | block_comment ;
+line_comment    = "//" , { ? any char except newline ? } ;
+hash_comment    = "#" , { ? any char except newline ? } ;
+block_comment   = "/*" , { ? any char ? } , "*/" ;
+EOF             = ? end-of-input ? ;
