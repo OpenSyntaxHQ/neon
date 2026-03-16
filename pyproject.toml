@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-q --strict-markers --maxfail=1 --cov=neon --cov-report=term-missing --cov-fail-under=85"
+testpaths = ["parsers/python/tests"]
+markers = [
+  "perf: performance-sensitive tests",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+src = ["parsers/python/src", "parsers/python/tests", "conformance", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "C4", "SIM"]
+
+[tool.mypy]
+python_version = "3.9"
+strict = true
+warn_unused_configs = true
+mypy_path = ["parsers/python/src"]
+packages = ["neon"]
